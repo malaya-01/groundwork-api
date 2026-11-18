@@ -34,6 +34,15 @@ export interface UserSettings {
   startDate: string; // Day 1 of the system, YYYY-MM-DD
   font: string; // handwriting font for the book
   books?: number[]; // year-books created in the universe view (years with pages are always included)
+  /** Per book (journal "j-2026" or library "series~vol-01"): where you stopped reading, and your bookmarks. */
+  reading?: Record<string, ReadingState>;
+}
+
+export interface ReadingState {
+  /** Page location: a journal page id ("d-2026-11-15") or a library location ("c12.40" = chapter 12, block 40). */
+  last?: string;
+  marks?: string[];
+  at?: string; // ISO time of the last change
 }
 
 // ---------------------------------------------------------------- account

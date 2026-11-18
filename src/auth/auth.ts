@@ -9,6 +9,7 @@ import {
   HttpCode,
   Injectable,
   Module,
+  Param,
   Post,
   Put,
   Req,
@@ -53,6 +54,14 @@ class SettingsDto {
   @IsOptional() @IsString() startDate?: string;
   @IsOptional() @IsString() @MaxLength(40) @Matches(/^[A-Za-z0-9 ]+$/) font?: string;
   @IsOptional() @IsArray() @ArrayMaxSize(300) @IsInt({ each: true }) @Min(2000, { each: true }) @Max(2200, { each: true }) books?: number[];
+}
+
+const BOOK_KEY = /^[a-z0-9][a-z0-9~:-]{0,120}$/;
+const LOCATION = /^[A-Za-z0-9:._-]{1,40}$/;
+
+class ReadingDto {
+  @IsOptional() @IsString() @Matches(LOCATION) last?: string;
+  @IsOptional() @IsArray() @ArrayMaxSize(50) @IsString({ each: true }) @Matches(LOCATION, { each: true }) marks?: string[];
 }
 
 interface TokenPayload {
@@ -130,6 +139,34 @@ export class AuthService {
     if (dto.startDate) next.startDate = dto.startDate;
     if (dto.font) next.font = dto.font;
     if (dto.books) next.books = [...new Set(dto.books)].sort((a, b) => a - b);
+    user.settings = next;
+    await this.users.save(user);
+    return next;
+  }
+
+  /** Merges one book's reading state (last page / bookmarks) into the settings. */
+  async updateReading(book: string, dto: ReadingDto): Promise<Settings> {
+    if (!BOOK_KEY.test(book)) throw new BadRequestException('Bad book id');
+    const [user] = await this.users.find({ take: 1 });
+    if (!user) throw new BadRequestException('No account yet');
+    const next: Settings = { ...DEFAULT_SETTINGS, ...user.settings };
+    const reading = { ...(next.reading ?? {}) };
+    const cur = reading[book] ?? {};
+    reading[book] = {
+      ...cur,
+      ...(dto.last !== undefined ? { last: dto.last } : {}),
+      ...(dto.marks !== undefined ? { marks: [...new Set(dto.marks)] } : {}),
+      at: new Date().toISOString(),
+    };
+    // keep the map bounded: drop the least recently touched books beyond 300
+    const keys = Object.keys(reading);
+    if (keys.length > 300) {
+      keys
+        .sort((a, b) => (reading[a].at ?? '').localeCompare(reading[b].at ?? ''))
+        .slice(0, keys.length - 300)
+        .forEach((k) => delete reading[k]);
+    }
+    next.reading = reading;
     user.settings = next;
     await this.users.save(user);
     return next;
@@ -225,6 +262,11 @@ export class SettingsController {
   @Put()
   put(@Body() dto: SettingsDto) {
     return this.auth.updateSettings(dto);
+  }
+
+  @Put('reading/:book')
+  reading(@Param('book') book: string, @Body() dto: ReadingDto) {
+    return this.auth.updateReading(book, dto);
   }
 }
 

@@ -6,6 +6,7 @@ import { MapsModule } from './maps/maps';
 import { LogsModule } from './logs/logs';
 import { ReviewsModule } from './reviews/reviews';
 import { MetricsModule } from './metrics/metrics';
+import { LibraryModule } from './library/library';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { MetricsModule } from './metrics/metrics';
     LogsModule,
     ReviewsModule,
     MetricsModule,
+    LibraryModule,
   ],
 })
 export class AppModule {}
